@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Dragon Dungeon</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+    
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    
+    .dungeon-bg {
+      background: linear-gradient(180deg, #0a0a0a 0%, #1a0f08 40%, #2d1810 70%, #1a0a0a 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .dungeon-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        radial-gradient(ellipse at 20% 80%, rgba(139, 69, 19, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(139, 69, 19, 0.3) 0%, transparent 40%),
+        repeating-linear-gradient(90deg, transparent 0px, transparent 120px, rgba(0,0,0,0.5) 120px, rgba(0,0,0,0.5) 124px),
+        repeating-linear-gradient(0deg, transparent 0px, transparent 90px, rgba(0,0,0,0.4) 90px, rgba(0,0,0,0.4) 93px);
+      pointer-events: none;
+    }
+    
+    .torch {
+      position: absolute;
+      width: 24px;
+      height: 50px;
+      background: linear-gradient(to top, #3a2a0a, #1a0a06);
+      border-radius: 3px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+    }
+    
+    .torch::before {
+      content: '';
+      position: absolute;
+      top: -35px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 35px;
+      background: radial-gradient(ellipse at center bottom, #ff8800, #ff6600, #ff3300, transparent);
+      border-radius: 50% 50% 30% 30%;
+      animation: flicker 0.4s ease-in-out infinite alternate;
+      box-shadow: 0 0 30px rgba(255, 100, 0, 0.8);
+    }
+    
+    .torch::after {
+      content: '';
+      position: absolute;
+      top: -80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(ellipse at center, rgba(255, 120, 30, 0.2), transparent 70%);
+      pointer-events: none;
+      animation: flicker 0.4s ease-in-out infinite alternate;
+    }
+    
+    @keyframes flicker {
+      0% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; }
+      100% { transform: translateX(-50%) scaleY(1.15) scaleX(0.95); opacity: 0.7; }
+    }
+    
+    .player {
+      position: absolute;
+      transition: all 0.08s ease-out;
+      filter: drop-shadow(0 0 8px rgba(100, 200, 255, 0.6)) drop-shadow(0 2px 4px rgba(0,0,0,0.7));
+    }
+
+    .sword {
+      position: absolute;
+      font-size: 48px;
+      transform-origin: center;
+      animation: rotate 3s linear infinite;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .dragon {
+      position: absolute;
+      transition: all 0.3s ease-out;
+      filter: drop-shadow(0 0 20px rgba(50, 200, 80, 0.5)) drop-shadow(0 4px 8px rgba(0,0,0,0.8));
+    }
+
+    .dragon.defeated {
+      opacity: 0.3;
+      transform: scale(0.5);
+      filter: grayscale(100%) drop-shadow(0 0 5px rgba(0,0,0,0.8));
+    }
+    
+    .fireball {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffff44, #ff8800, #ff3300, #cc0000);
+      box-shadow: 0 0 25px #ff6600, 0 0 50px #ff3300, inset -2px -2px 8px rgba(0,0,0,0.4);
+      animation: burn 0.25s ease-in-out infinite alternate;
+    }
+    
+    @keyframes burn {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.15); }
+    }
+    
+    .game-over {
+      animation: shake 0.6s ease-in-out;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-12px); }
+      20%, 40%, 60%, 80% { transform: translateX(12px); }
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    
+    .bounce { animation: bounce 0.8s ease-in-out infinite; }
+    
+    .medieval-font { font-family: 'MedievalSharp', cursive; }
+    
+    .gold-text {
+      color: #ffd700;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8);
+    }
+    
+    .stone-button {
+      background: linear-gradient(180deg, #5a4a3a 0%, #3a2a1a 50%, #2a1a0a 100%);
+      border: 3px solid #6a5a4a;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), 0 4px 8px rgba(0,0,0,0.6);
+      transition: all 0.2s;
+    }
+    
+    .stone-button:hover {
+      background: linear-gradient(180deg, #6a5a4a 0%, #4a3a2a 50%, #3a2a1a 100%);
+      transform: translateY(-2px);
+    }
+    
+    .stone-button:active {
+      transform: translateY(2px);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+    }
+    
+    .control-btn {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(180deg, #4a3a2a 0%, #2a1a0a 100%);
+      border: 2px solid #5a4a3a;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.1);
+      transition: all 0.1s;
+      font-size: 32px;
+    }
+    
+    .control-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(0,0,0,0.4);
+      background: linear-gradient(180deg, #5a4a3a 0%, #3a2a1a 100%);
+    }
+    
+    @media (max-width: 480px) {
+      .control-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 28px;
+      }
+    }
+    
+    .health-bar-bg {
+      background: linear-gradient(180deg, #1a0a0a, #0a0505);
+      border: 2px solid #3a2a1a;
+      border-radius: 8px;
+      padding: 3px;
+    }
+    
+    .health-bar {
+      background: linear-gradient(180deg, #ff4444, #cc0000, #aa0000);
+      border-radius: 5px;
+      transition: width 0.3s ease-out;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    }
+    
+    .score-display {
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #6a5a4a;
+      border-radius: 10px;
+      padding: 8px 16px;
+    }
+    
+    @media (max-width: 640px) {
+      .score-display {
+        padding: 6px 12px;
+      }
+      
+      .stone-button {
+        padding: 0.75rem 1.5rem;
+      }
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="game-container" class="dungeon-bg h-full w-full relative"><!-- Torches -->
+   <div class="torch" style="left: 10%; top: 15%;"></div>
+   <div class="torch" style="right: 10%; top: 15%;"></div>
+   <div class="torch" style="left: 10%; top: 55%;"></div>
+   <div class="torch" style="right: 10%; top: 55%;"></div><!-- Game UI -->
+   <div id="game-ui" class="absolute top-4 left-4 right-4 flex justify-between items-start z-20">
+    <div class="score-display">
+     <p class="medieval-font gold-text text-lg">Score: <span id="score">0</span></p>
+    </div>
+    <div class="flex flex-col items-end gap-2">
+     <div class="health-bar-bg w-32">
+      <div id="health-bar" class="health-bar h-4" style="width: 100%;"></div>
+     </div>
+     <p class="medieval-font text-red-400 text-sm">❤️ <span id="health">3</span>/3</p>
+    </div>
+   </div><!-- Game Title -->
+   <h1 id="game-title" class="absolute top-1/4 left-1/2 transform -translate-x-1/2 medieval-font gold-text text-4xl md:text-5xl text-center z-10 pointer-events-none opacity-0 transition-opacity duration-500">Dragon Dungeon</h1><!-- Start Screen -->
+   <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-black/70">
+    <h1 class="medieval-font gold-text text-4xl sm:text-5xl md:text-6xl mb-4 bounce">🐉 Dragon Dungeon</h1>
+    <p class="medieval-font text-orange-300 text-base sm:text-lg mb-8">Survive the dragon's fury!</p><button id="start-btn" class="stone-button medieval-font text-orange-200 text-lg sm:text-2xl px-6 sm:px-8 py-3 sm:py-4 rounded-lg"> ⚔️ Begin Quest </button>
+    <p class="medieval-font text-gray-400 text-xs sm:text-sm mt-6">Use arrow keys or touch controls</p>
+   </div><!-- Difficulty Selection Screen -->
+   <div id="difficulty-screen" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-black/80 hidden">
+    <h1 class="medieval-font gold-text text-4xl sm:text-5xl md:text-6xl mb-8 bounce">⚡ Choose Your Fate</h1>
+    <div class="grid grid-cols-2 gap-4 sm:gap-6"><button id="easy-btn" class="stone-button medieval-font text-orange-200 text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-lg w-32 sm:w-40"> 🔥 Easy 
+      <div class="text-xs text-gray-300">
+       1 Dragon
+      </div></button> <button id="normal-btn" class="stone-button medieval-font text-orange-200 text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-lg w-32 sm:w-40"> 🔥🔥 Normal 
+      <div class="text-xs text-gray-300">
+       2 Dragons
+      </div></button> <button id="hard-btn" class="stone-button medieval-font text-orange-200 text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-lg w-32 sm:w-40"> 🔥🔥🔥 Hard 
+      <div class="text-xs text-gray-300">
+       3 Dragons
+      </div></button> <button id="legendary-btn" class="stone-button medieval-font text-orange-200 text-lg sm:text-xl px-4 sm:px-6 py-3 sm:py-4 rounded-lg w-32 sm:w-40"> ⚔️ Legendary 
+      <div class="text-xs text-gray-300">
+       4 Dragons + Sword
+      </div></button>
+    </div>
+   </div><!-- Game Over Screen -->
+   <div id="game-over-screen" class="absolute inset-0 flex flex-col items-center justify-center z-30 bg-black/80 hidden">
+    <h1 class="medieval-font text-red-500 text-5xl md:text-6xl mb-4">💀 Defeated!</h1>
+    <p class="medieval-font gold-text text-2xl mb-2">Final Score: <span id="final-score">0</span></p>
+    <p class="medieval-font text-orange-300 text-lg mb-8">High Score: <span id="high-score">0</span></p><button id="restart-btn" class="stone-button medieval-font text-orange-200 text-2xl px-8 py-4 rounded-lg"> 🔄 Try Again </button>
+   </div><!-- Player -->
+   <div id="player" class="player" style="font-size: 48px;">
+    🧙
+   </div><!-- Sword (only for Legendary mode) -->
+   <div id="sword" class="sword hidden" style="font-size: 48px;">
+    ⚔️
+   </div><!-- Dragons Container -->
+   <div id="dragons-container"></div><!-- Fireballs Container -->
+   <div id="fireballs"></div><!-- Touch Controls -->
+   <div id="touch-controls" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 md:hidden">
+    <div class="flex flex-col items-center gap-2"><button class="control-btn" data-dir="up"> <span class="text-2xl">⬆️</span> </button>
+     <div class="flex gap-2"><button class="control-btn" data-dir="left"> <span class="text-2xl">⬅️</span> </button> <button class="control-btn" data-dir="down"> <span class="text-2xl">⬇️</span> </button> <button class="control-btn" data-dir="right"> <span class="text-2xl">➡️</span> </button>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: 'Dragon Dungeon',
+      primary_color: '#ffd700',
+      secondary_color: '#ff6600',
+      text_color: '#ffa500',
+      background_color: '#1a0f08',
+      accent_color: '#cc0000'
+    };
+
+    let config = { ...defaultConfig };
+
+    // Element SDK initialization
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (newConfig) => {
+          config = { ...defaultConfig, ...newConfig };
+          applyConfig();
+        },
+        mapToCapabilities: (cfg) => ({
+          recolorables: [
+            {
+              get: () => cfg.primary_color || defaultConfig.primary_color,
+              set: (v) => { cfg.primary_color = v; window.elementSdk.setConfig({ primary_color: v }); }
+            },
+            {
+              get: () => cfg.secondary_color || defaultConfig.secondary_color,
+              set: (v) => { cfg.secondary_color = v; window.elementSdk.setConfig({ secondary_color: v }); }
+            },
+            {
+              get: () => cfg.text_color || defaultConfig.text_color,
+              set: (v) => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); }
+            },
+            {
+              get: () => cfg.background_color || defaultConfig.background_color,
+              set: (v) => { cfg.background_color = v; window.elementSdk.setConfig({ background_color: v }); }
+            },
+            {
+              get: () => cfg.accent_color || defaultConfig.accent_color,
+              set: (v) => { cfg.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); }
+            }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (cfg) => new Map([
+          ['game_title', cfg.game_title || defaultConfig.game_title]
+        ])
+      });
+    }
+
+    function applyConfig() {
+      document.getElementById('game-title').textContent = config.game_title || defaultConfig.game_title;
+      document.querySelector('#start-screen h1').innerHTML = `🐉 ${config.game_title || defaultConfig.game_title}`;
+    }
+
+    // Game State
+    const gameState = {
+      isPlaying: false,
+      score: 0,
+      health: 3,
+      highScore: parseInt(localStorage.getItem('dragonDungeonHighScore') || '0'),
+      playerX: 0,
+      playerY: 0,
+      swordX: 0,
+      swordY: 0,
+      dragons: [],
+      fireballs: [],
+      keys: { up: false, down: false, left: false, right: false },
+      gameLoop: null,
+      fireballIntervals: [],
+      difficultyTimer: null,
+      difficulty: 'easy',
+      fireballSpeed: 4,
+      fireballRate: 1500,
+      hasLegendarySword: false,
+      defeatedDragons: 0
+    };
+
+    // DOM Elements
+    const container = document.getElementById('game-container');
+    const player = document.getElementById('player');
+    const dragonsContainer = document.getElementById('dragons-container');
+    const fireballsContainer = document.getElementById('fireballs');
+    const startScreen = document.getElementById('start-screen');
+    const difficultyScreen = document.getElementById('difficulty-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const scoreDisplay = document.getElementById('score');
+    const healthBar = document.getElementById('health-bar');
+    const healthText = document.getElementById('health');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const highScoreDisplay = document.getElementById('high-score');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const gameTitle = document.getElementById('game-title');
+    const swordElement = document.getElementById('sword');
+
+    // Difficulty buttons
+    document.getElementById('easy-btn').addEventListener('click', () => startGameWithDifficulty('easy'));
+    document.getElementById('normal-btn').addEventListener('click', () => startGameWithDifficulty('normal'));
+    document.getElementById('hard-btn').addEventListener('click', () => startGameWithDifficulty('hard'));
+    document.getElementById('legendary-btn').addEventListener('click', () => startGameWithDifficulty('legendary'));
+
+    // Initialize positions
+    function initPositions() {
+      const rect = container.getBoundingClientRect();
+      gameState.playerX = rect.width / 2 - 24;
+      gameState.playerY = rect.height - 120;
+      gameState.swordX = gameState.playerX;
+      gameState.swordY = gameState.playerY;
+      updatePlayerPosition();
+    }
+
+    function updatePlayerPosition() {
+      player.style.left = gameState.playerX + 'px';
+      player.style.top = gameState.playerY + 'px';
+      
+      if (gameState.hasLegendarySword) {
+        gameState.swordX = gameState.playerX;
+        gameState.swordY = gameState.playerY;
+        swordElement.style.left = gameState.swordX + 'px';
+        swordElement.style.top = gameState.swordY + 'px';
+      }
+    }
+
+    // Create dragons based on difficulty
+    function createDragons() {
+      dragonsContainer.innerHTML = '';
+      gameState.dragons = [];
+      gameState.defeatedDragons = 0;
+
+      const rect = container.getBoundingClientRect();
+      const positions = [];
+
+      if (gameState.difficulty === 'easy') {
+        positions.push({ x: rect.width / 2 - 36, y: 80 });
+      } else if (gameState.difficulty === 'normal') {
+        positions.push({ x: rect.width / 2 - 36, y: 50 });
+        positions.push({ x: rect.width / 2 - 36, y: 150 });
+      } else if (gameState.difficulty === 'hard') {
+        positions.push({ x: rect.width / 2 - 36, y: 20 });
+        positions.push({ x: rect.width / 2 - 36, y: 90 });
+        positions.push({ x: rect.width / 2 - 36, y: 160 });
+      } else if (gameState.difficulty === 'legendary') {
+        positions.push({ x: 50, y: 40 });
+        positions.push({ x: rect.width - 86, y: 40 });
+        positions.push({ x: 50, y: 150 });
+        positions.push({ x: rect.width - 86, y: 150 });
+      }
+
+      positions.forEach((pos, index) => {
+        const dragonElement = document.createElement('div');
+        dragonElement.className = 'dragon';
+        dragonElement.id = `dragon-${index}`;
+        dragonElement.textContent = '🐲';
+        dragonElement.style.fontSize = '72px';
+        dragonElement.style.left = pos.x + 'px';
+        dragonElement.style.top = pos.y + 'px';
+        dragonsContainer.appendChild(dragonElement);
+
+        gameState.dragons.push({
+          id: index,
+          element: dragonElement,
+          x: pos.x,
+          y: pos.y,
+          defeated: false
+        });
+      });
+    }
+
+    // Player movement
+    function movePlayer() {
+      const speed = 8;
+      const rect = container.getBoundingClientRect();
+      const playerSize = 48;
+      const padding = 20;
+      const topMargin = 100;
+      const bottomMargin = 120;
+
+      if (gameState.keys.up) gameState.playerY = Math.max(topMargin, gameState.playerY - speed);
+      if (gameState.keys.down) gameState.playerY = Math.min(rect.height - playerSize - bottomMargin, gameState.playerY + speed);
+      if (gameState.keys.left) gameState.playerX = Math.max(padding, gameState.playerX - speed);
+      if (gameState.keys.right) gameState.playerX = Math.min(rect.width - playerSize - padding, gameState.playerX + speed);
+
+      updatePlayerPosition();
+    }
+
+    // Dragon AI
+    function moveDragons() {
+      const rect = container.getBoundingClientRect();
+
+      gameState.dragons.forEach((dragon, index) => {
+        if (dragon.defeated) return;
+
+        const targetX = gameState.playerX;
+        const dx = targetX - dragon.x;
+        const dragonSpeed = gameState.difficulty === 'easy' ? 1.5 : gameState.difficulty === 'normal' ? 2 : 2.5;
+
+        dragon.x += dx * 0.02;
+        dragon.x = Math.max(20, Math.min(rect.width - 72, dragon.x));
+
+        // Slight bobbing
+        dragon.y = dragon.y + Math.sin(Date.now() / 500) * 0.5;
+
+        dragon.element.style.left = dragon.x + 'px';
+        dragon.element.style.top = dragon.y + 'px';
+      });
+    }
+
+    // Fireball system
+    function createFireballs() {
+      if (!gameState.isPlaying) return;
+
+      gameState.dragons.forEach((dragon) => {
+        if (dragon.defeated) return;
+
+        const rect = container.getBoundingClientRect();
+        const fireball = document.createElement('div');
+        fireball.className = 'fireball';
+        
+        const startX = dragon.x + 24;
+        const startY = dragon.y + 60;
+        
+        const spread = (Math.random() - 0.5) * 100;
+        const targetX = gameState.playerX + spread;
+        const targetY = gameState.playerY;
+        
+        const angle = Math.atan2(targetY - startY, targetX - startX);
+        const vx = Math.cos(angle) * gameState.fireballSpeed;
+        const vy = Math.sin(angle) * gameState.fireballSpeed;
+
+        fireball.style.left = startX + 'px';
+        fireball.style.top = startY + 'px';
+
+        fireballsContainer.appendChild(fireball);
+
+        gameState.fireballs.push({
+          element: fireball,
+          x: startX,
+          y: startY,
+          vx,
+          vy
+        });
+      });
+    }
+
+    function updateFireballs() {
+      const rect = container.getBoundingClientRect();
+      const playerRect = { x: gameState.playerX, y: gameState.playerY, width: 40, height: 48 };
+      const swordRadius = gameState.hasLegendarySword ? 60 : 0;
+
+      gameState.fireballs = gameState.fireballs.filter(fb => {
+        fb.x += fb.vx;
+        fb.y += fb.vy;
+
+        fb.element.style.left = fb.x + 'px';
+        fb.element.style.top = fb.y + 'px';
+
+        // Check bounds
+        if (fb.x < -30 || fb.x > rect.width + 30 || fb.y < -30 || fb.y > rect.height + 30) {
+          fb.element.remove();
+          return false;
+        }
+
+        // Check sword collision (Legendary mode)
+        if (gameState.hasLegendarySword) {
+          const dist = Math.sqrt(Math.pow(fb.x - gameState.swordX - 24, 2) + Math.pow(fb.y - gameState.swordY - 24, 2));
+          if (dist < swordRadius) {
+            fb.element.remove();
+            return false;
+          }
+        }
+
+        // Check player collision
+        const fbRect = { x: fb.x, y: fb.y, width: 24, height: 24 };
+        if (checkCollision(playerRect, fbRect)) {
+          fb.element.remove();
+          takeDamage();
+          return false;
+        }
+
+        return true;
+      });
+    }
+
+    function checkCollision(a, b) {
+      return a.x < b.x + b.width &&
+             a.x + a.width > b.x &&
+             a.y < b.y + b.height &&
+             a.y + a.height > b.y;
+    }
+
+    // Dragon slashing (Legendary mode)
+    function checkDragonSlash() {
+      if (!gameState.hasLegendarySword) return;
+
+      const swordRadius = 80;
+      gameState.dragons.forEach((dragon) => {
+        if (dragon.defeated) return;
+
+        const dist = Math.sqrt(Math.pow(dragon.x - gameState.swordX, 2) + Math.pow(dragon.y - gameState.swordY, 2));
+        if (dist < swordRadius) {
+          dragon.defeated = true;
+          dragon.element.classList.add('defeated');
+          gameState.defeatedDragons++;
+          gameState.score += 500;
+          scoreDisplay.textContent = gameState.score;
+
+          if (gameState.defeatedDragons === gameState.dragons.length) {
+            gameWin();
+          }
+        }
+      });
+    }
+
+    function gameWin() {
+      gameState.isPlaying = false;
+      clearInterval(gameState.fireballInterval);
+      clearInterval(gameState.difficultyTimer);
+
+      if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('dragonDungeonHighScore', gameState.highScore.toString());
+      }
+
+      finalScoreDisplay.textContent = gameState.score;
+      highScoreDisplay.textContent = gameState.highScore;
+
+      container.classList.add('game-over');
+      setTimeout(() => {
+        container.classList.remove('game-over');
+        gameOverScreen.innerHTML = `
+          <h1 class="medieval-font text-yellow-400 text-5xl md:text-6xl mb-4">🏆 Victory!</h1>
+          <p class="medieval-font gold-text text-2xl mb-2">Final Score: <span id="final-score">${gameState.score}</span></p>
+          <p class="medieval-font text-orange-300 text-lg mb-8">High Score: <span id="high-score">${gameState.highScore}</span></p>
+          <button id="restart-btn" class="stone-button medieval-font text-orange-200 text-2xl px-8 py-4 rounded-lg"> 🔄 Play Again </button>
+        `;
+        gameOverScreen.classList.remove('hidden');
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+      }, 600);
+    }
+
+    function takeDamage() {
+      gameState.health--;
+      healthText.textContent = gameState.health;
+      healthBar.style.width = (gameState.health / 3 * 100) + '%';
+
+      player.style.filter = 'brightness(3) drop-shadow(0 0 20px red)';
+      setTimeout(() => {
+        player.style.filter = 'drop-shadow(0 0 8px rgba(100, 200, 255, 0.6)) drop-shadow(0 2px 4px rgba(0,0,0,0.7))';
+      }, 200);
+
+      if (gameState.health <= 0) {
+        gameOver();
+      }
+    }
+
+    // Score system
+    function updateScore() {
+      if (!gameState.isPlaying) return;
+      gameState.score += 1;
+      scoreDisplay.textContent = gameState.score;
+    }
+
+    // Difficulty scaling
+    function increaseDifficulty() {
+      if (!gameState.isPlaying) return;
+      
+      gameState.fireballSpeed = Math.min(12, gameState.fireballSpeed + 0.3);
+      gameState.fireballRate = Math.max(400, gameState.fireballRate - 50);
+
+      gameState.fireballIntervals.forEach(interval => clearInterval(interval));
+      gameState.fireballIntervals = [];
+      gameState.fireballIntervals.push(setInterval(createFireballs, gameState.fireballRate));
+    }
+
+    // Game loop
+    function gameLoop() {
+      if (!gameState.isPlaying) return;
+
+      movePlayer();
+      moveDragons();
+      updateFireballs();
+      checkDragonSlash();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start game with difficulty
+    function startGameWithDifficulty(difficulty) {
+      gameState.difficulty = difficulty;
+      gameState.hasLegendarySword = difficulty === 'legendary';
+      startGame();
+    }
+
+    // Start game
+    function startGame() {
+      gameState.isPlaying = true;
+      gameState.score = 0;
+      gameState.health = 3;
+      gameState.fireballSpeed = 4;
+      gameState.fireballRate = 1500;
+      gameState.fireballs = [];
+      gameState.fireballIntervals = [];
+
+      fireballsContainer.innerHTML = '';
+      createDragons();
+
+      scoreDisplay.textContent = '0';
+      healthBar.style.width = '100%';
+      healthText.textContent = '3';
+      startScreen.classList.add('hidden');
+      difficultyScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      gameTitle.style.opacity = '0';
+
+      if (gameState.hasLegendarySword) {
+        swordElement.classList.remove('hidden');
+      } else {
+        swordElement.classList.add('hidden');
+      }
+
+      initPositions();
+
+      gameLoop();
+      gameState.fireballIntervals.push(setInterval(createFireballs, gameState.fireballRate));
+      gameState.difficultyTimer = setInterval(increaseDifficulty, 5000);
+      setInterval(updateScore, 100);
+    }
+
+    // Game over
+    function gameOver() {
+      gameState.isPlaying = false;
+
+      gameState.fireballIntervals.forEach(interval => clearInterval(interval));
+      clearInterval(gameState.difficultyTimer);
+
+      if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('dragonDungeonHighScore', gameState.highScore.toString());
+      }
+
+      finalScoreDisplay.textContent = gameState.score;
+      highScoreDisplay.textContent = gameState.highScore;
+
+      container.classList.add('game-over');
+      setTimeout(() => {
+        container.classList.remove('game-over');
+        gameOverScreen.classList.remove('hidden');
+      }, 600);
+    }
+
+    // Input handling
+    document.addEventListener('keydown', (e) => {
+      if (!gameState.isPlaying) return;
+      switch(e.key) {
+        case 'ArrowUp': case 'w': case 'W': gameState.keys.up = true; break;
+        case 'ArrowDown': case 's': case 'S': gameState.keys.down = true; break;
+        case 'ArrowLeft': case 'a': case 'A': gameState.keys.left = true; break;
+        case 'ArrowRight': case 'd': case 'D': gameState.keys.right = true; break;
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      switch(e.key) {
+        case 'ArrowUp': case 'w': case 'W': gameState.keys.up = false; break;
+        case 'ArrowDown': case 's': case 'S': gameState.keys.down = false; break;
+        case 'ArrowLeft': case 'a': case 'A': gameState.keys.left = false; break;
+        case 'ArrowRight': case 'd': case 'D': gameState.keys.right = false; break;
+      }
+    });
+
+    // Touch controls
+    document.querySelectorAll('.control-btn').forEach(btn => {
+      const dir = btn.dataset.dir;
+      
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        gameState.keys[dir] = true;
+      });
+      
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        gameState.keys[dir] = false;
+      });
+      
+      btn.addEventListener('mousedown', () => gameState.keys[dir] = true);
+      btn.addEventListener('mouseup', () => gameState.keys[dir] = false);
+      btn.addEventListener('mouseleave', () => gameState.keys[dir] = false);
+    });
+
+    // Button handlers
+    startBtn.addEventListener('click', () => {
+      startScreen.classList.add('hidden');
+      difficultyScreen.classList.remove('hidden');
+    });
+
+    restartBtn.addEventListener('click', startGame);
+
+    // Initialize
+    initPositions();
+    applyConfig();
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+      if (!gameState.isPlaying) {
+        initPositions();
+      }
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d31eb7fe0a4a6af',t:'MTc3MTk2NzExNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
